@@ -3,7 +3,7 @@ from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
 
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 
 
 class get_pybind_include(object):
@@ -99,6 +99,8 @@ class BuildExt(build_ext):
             ext.extra_link_args = link_opts
         build_ext.build_extensions(self)
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(
     name='nplocate',
@@ -106,11 +108,17 @@ setup(
     packages=["nplocate"],
     author='Yushi Yang',
     author_email='yangyushi1992@icloud.com',
-    url='',
+    url='https://github.com/yangyushi/nplocate',
     description='Python tools to locate nano particles from confocal microscope images',
-    long_description='',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    classifiers=[
+        "Programming Language :: Python",
+        "Operating System :: OS Independent",
+    ],
     ext_modules=ext_modules,
     setup_requires=['pybind11>=2.5.0'],
     cmdclass={'build_ext': BuildExt},
     zip_safe=False,
+    install_requires=['numpy', 'scipy', 'matplotlib'],
 )
