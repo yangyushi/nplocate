@@ -5,7 +5,7 @@
 
 `nplocate` is a custom script I wrote to locate very tiny particles from a confocal image. These images often suffered from extreme influences of the [PSF](https://en.wikipedia.org/wiki/Point_spread_function), even after very detailed and completed deconvolution procedures.
 
-To squeeze a bit more information out of these highly distorted data, I wrote this code to effectly "fit" the entire 3D image. This is done in a quite sloopy way. For a perfect fit, please take a look at the very ver well crafted [peri](https://github.com/peri-source/peri) project.
+To squeeze a bit more information out of these highly distorted data, I wrote this code to effectly "fit" the entire 3D image. This is done in a quite sloopy way. For a perfect fit, please take a look at the very well crafted [peri](https://github.com/peri-source/peri) project.
 
 
 ## The idea
