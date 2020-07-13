@@ -1,0 +1,9 @@
+**/*.so
+**/tags
+**/__pycache__
+.*
+!.gitignore
+**egg-info**
+build
+dist
+var
