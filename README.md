@@ -38,3 +38,7 @@ pip install .
 
 
 There are some notebooks in the folder `example` that introduced how to use this package, along with [trackpy](https://github.com/soft-matter/trackpy). 
+
+## Cite the code
+
+~~Just tell people you used trackpy~~
