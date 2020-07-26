@@ -173,6 +173,28 @@ def feature_plot_2d(X):
     plt.show()
 
 
+def reduce_dimension(features, percentage=0.95):
+    """
+    Use the principle component analysis (PCA) to reduce the dimension
+        of the features. The final dimension is determined by retaining
+        a fixed percentage of variance.
+
+    Args:
+        features (np.ndarray): the shape is (n_feature, n_sample)
+        percentage (float): the percentage of variance to be retained, (0 ~ 1)
+
+    Return:
+        np.ndarray: the features in a reduced dimensional space,
+            the shape is (n_feature_reduced, n_sample)
+    """
+    cov = features @ features.T / features.shape[1]
+    u, s, vh = np.linalg.svd(cov)
+    variance_retained = 1 - s / s.sum()
+    to_retain = (variance_retained <= percentage).sum() + 1
+    u_reduced = u[:, :to_retain]
+    return u_reduced.T @ features
+
+
 class ParticleFeatures:
     __stat_methods = [
         lambda x : np.nanmean(x, axis=1),
@@ -190,10 +212,8 @@ class ParticleFeatures:
         self.__intensities = get_intensities(positions, image, radius)
         self.nnd = get_nn_distances(positions)
         self.features = self.__get_features()
-        self.features_1d = np.reshape(self.features, (36, self.__n))
-        self.mu, self.cov = get_gaussian_par(self.features_1d)
-        self.fun = get_gaussian_fun(self.mu, self.cov)
-        self.prob = self.fun(self.features_1d)
+        self.m0 = np.nansum(self.__intensities, axis=1)
+        self.m2 = np.nansum(self.__spatial[8] * self.__intensities, axis=1) / self.m0
 
     def __get_features(self):
         """
@@ -232,3 +252,14 @@ class ParticleFeatures:
                 features[row, col] = (f - f.mean()) / (f.max() - f.min())
         return features
 
+    def get_probability(self):
+        features = np.reshape(self.features, (36, self.__n))
+        mu, cov = get_gaussian_par(features)
+        return get_gaussian_fun(mu, cov)(features)
+
+    def get_probability_reduced(self, percentage=95):
+        features = np.reshape(self.features, (36, self.__n))
+        features_reduced = reduce_dimension(features, percentage)
+        print(features_reduced.shape)
+        mu, cov = get_gaussian_par(features_reduced)
+        return get_gaussian_fun(mu, cov)(features_reduced)

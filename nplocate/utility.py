@@ -102,6 +102,33 @@ def see_slice(image, positions, s, radius, axis=2, sizes=(10, 8)):
     plt.show()
 
 
+def see_particle(position, image, radius):
+    shape = np.array(image.shape)
+    shape_canvas = shape + 2 * radius
+    canvas = np.zeros(shape_canvas, dtype=image.dtype)
+    canvas[
+        radius : shape[0] + radius,
+        radius : shape[1] + radius,
+        radius : shape[2] + radius,
+    ] = image
+    ox, oy, oz = position.astype(int) + radius
+    plt.subplot(121).imshow(
+        canvas[ox-radius: ox+radius+1, oy-radius:oy+radius+1, oz].T
+    )
+    plt.scatter(radius, radius, marker='+', color='tomato', s=128)
+    plt.ylim(0, 2*radius+1)
+    plt.title("XY")
+    plt.axis('off')
+    plt.subplot(122).imshow(
+        canvas[ox, oy-radius: oy+radius+1, oz-radius:oz+radius+1]
+    )
+    plt.scatter(radius, radius, marker='+', color='tomato', s=128)
+    plt.ylim(0, 2*radius+1)
+    plt.title("ZY")
+    plt.axis('off')
+    plt.show()
+
+
 def get_gr(positions, cutoff, bins, minimum_gas_number=1e4):
     bins = np.linspace(0, cutoff, bins)
     drs = bins[1:] - bins[:-1]
@@ -390,3 +417,5 @@ def save_xyz(filename, frames):
                 comments='',
                 header=f'{num}\nframe {i}'
             )
+
+
