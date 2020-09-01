@@ -415,7 +415,7 @@ def save_xyz(filename, frames):
                 delimiter='\t',
                 fmt=['A\t%.8e'] + ['%.8e' for i in range(dim - 1)],
                 comments='',
-                header=f'{num}\nframe {i}'
+                header='%s\nframe %s' % (num, i)
             )
 
 
