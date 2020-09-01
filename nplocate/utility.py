@@ -24,11 +24,11 @@ def join_pairs_py(pairs, copy=True):
         >>> join_pairs(pairs)
         [(2, 3, 5, 6), (8, 9, 10)]
     """
-    pairs_joined = pairs.copy() if copy else pairs
+    pairs_joined = pairs[:] if copy else pairs
     for p1 in pairs_joined:
         for p2 in pairs_joined:
             if (p1 is not p2) and should_join(p1, p2):
-                pairs_joined.append(tuple(set(p1 + p2)))
+                pairs_joined.append(tuple(set(list(p1) + list(p2))))
                 pairs_joined.remove(p1)
                 pairs_joined.remove(p2)
                 pairs_joined = join_pairs(pairs_joined, copy=False)
@@ -166,7 +166,7 @@ def simulate(centres, model, image):
     r = ((np.array(model.shape) - 1) / 2).astype(int)
     canvas = np.zeros(np.array(image.shape) + 2 * r, dtype=model.dtype)
     radii = np.array((np.array(model.shape) - 1) / 2, dtype=int)
-    box = tuple([slice(radii[d], -radii[d]) for d in range(3)])
+    box = tuple([slice(radii[d], - radii[d]) for d in range(3)])
     for c in centres.astype(int):
         canvas[
             c[0] : c[0] + 2 * radii[0] + 1,
@@ -185,9 +185,9 @@ def gaussian_model_2d(mesh, intensity, sigma_1, sigma_2, offset):
 
 
 def fit_shape(shape):
-    mesh = np.indices(shape.shape) - np.array([[shape.shape]]).T / 2
+    mesh = np.indices(shape.shape) - np.array([[shape.shape]]).T / 2.0
     sigma = -mesh[0]**2 - mesh[1]**2
-    initial_guess = shape.max(), 1, 1, shape.min()
+    initial_guess = float(shape.max()), 1.0, 1.0, float(shape.min())
     p_opt, p_cov = curve_fit(gaussian_model_2d, mesh, shape.ravel(), initial_guess, sigma=sigma.ravel())
     return p_opt
 
@@ -226,7 +226,7 @@ def get_model(image, centres, radius, project_axis=0, want_measure=False):
         project_axis (int): the axis along wichi the 3D average shape will be projected
     """
     shape = np.mean(get_sub_images_3d(image, centres, radius), axis=0)
-    res = fit_shape(shape.mean(project_axis))
+    res = np.abs(fit_shape(shape.mean(project_axis)))
     model = np.zeros(np.array(shape.shape))
     model[radius, radius, radius] = 1
     model = ndimage.gaussian_filter(model, (res[1], res[1], res[2]))
@@ -310,7 +310,8 @@ def get_position_bounds(positions, image):
 def remove_overlap(xyz, image, diameter):
     dist_mat = squareform(pdist(xyz))
     adj_mat = np.triu(dist_mat < diameter, k=1)
-    pairs = np.array(np.nonzero(adj_mat)).T.tolist() # (n ,2), python list
+    pairs = np.array(np.nonzero(adj_mat)).T  # (n ,2)
+    pairs = pairs.tolist()
     pairs = join_pairs(pairs)
     to_delete = []
     for pair in pairs:

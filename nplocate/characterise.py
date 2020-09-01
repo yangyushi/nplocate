@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 from numba import njit
 from scipy import stats
@@ -24,7 +25,10 @@ def get_gaussian_fun(mu, cov):
     A = 1 / ((2 * np.pi)**(n / 2) * c**0.5)
     icov = np.linalg.inv(cov)
     return lambda X: A * np.exp(
-        -0.5 * np.sum((X - mu).T @ icov * (X - mu).T, axis=1)
+        -0.5 * np.sum(
+            np.dot((X - mu).T,  icov) * (X - mu).T,
+            axis=1
+        )
     )
 
 
@@ -146,7 +150,7 @@ def get_gaussian_par(features):
         features (np.ndarray): shape (n_features, n_samples)
     """
     mu = np.mean(features, axis=1)[:, np.newaxis]
-    cov = (features - mu) @ (features - mu).T
+    cov = np.dot((features - mu), (features - mu).T)
     return mu, cov
 
 
@@ -187,12 +191,12 @@ def reduce_dimension(features, percentage=0.95):
         np.ndarray: the features in a reduced dimensional space,
             the shape is (n_feature_reduced, n_sample)
     """
-    cov = features @ features.T / features.shape[1]
+    cov = np.dot(features, features.T) / features.shape[1]
     u, s, vh = np.linalg.svd(cov)
     variance_retained = 1 - s / s.sum()
     to_retain = (variance_retained <= percentage).sum() + 1
     u_reduced = u[:, :to_retain]
-    return u_reduced.T @ features
+    return np.dot(u_reduced.T, features)
 
 
 class ParticleFeatures:
