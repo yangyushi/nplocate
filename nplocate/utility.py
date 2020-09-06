@@ -420,3 +420,60 @@ def save_xyz(filename, frames):
             )
 
 
+@njit
+def spherical_ft(f, k, r, dr):
+    ft = np.zeros(len(k))
+    for i in range(len(k)):
+        ft[i] = 4. * np.pi * np.sum(
+            r * np.sin(k[i] * r) * f * dr
+        ) / k[i]
+    return ft
+
+
+@njit
+def inverse_spherical_ft(ff, k, r, dk):
+    inft = np.zeros(len(r))
+    for i in range(len(r)):
+        inft[i] = np.sum(
+            k * np.sin(k * r[i]) * ff * dk
+        ) / r[i] / (2 * np.pi ** 2)
+    return inft
+
+
+def get_gr_pyhs(eta, r_max=5.0, points=1000):
+    """
+    Calculate the radial distribution function
+        for Hard Spheres using the Percus-Yevick Approximation
+
+    In the calculation the length is rescaled by the particle diameter 
+
+    Args:
+        eta (float): the volume fraction of the system
+        r_max (float): the maximum value of the radius
+        points (int): the number of points in the gr figure
+
+    Example:
+        >>> r, gr = get_gr_pyhs(0.5)
+    """
+    r = np.linspace(r_max / points, r_max, points)
+    dk = 1 / r[-1]
+    dr = r[1] - r[0]
+    k = np.arange(1, points + 1) * dk
+    rho = 6 / np.pi * eta
+
+    # Percus-Yevick
+    c0 = -(1 + 2 * eta)**2 / (1 - eta)**4
+    c1 = 6 * eta * (1 + 0.5 * eta)**2 / (1 - eta) ** 4
+    c2 = eta * c0 * 0.5
+    c_direct = c0 + c1 * r + c2 * r**3
+    c_direct[r > 1] = 0
+
+    # Ornstein-Zernike Equation
+    c_direct_ft = spherical_ft(c_direct, k, r, dr)
+    h_ft = c_direct_ft / (1 - rho * c_direct_ft)
+    h = inverse_spherical_ft(h_ft, k, r, dk)
+
+    gr = h + 1
+    gr[r < 1] = 0
+    return r, gr
+
