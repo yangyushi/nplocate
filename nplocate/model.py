@@ -410,9 +410,6 @@ class GaussianSphere:
         Args:
             image (numpy.ndarray): a 3D volumetric image
             positions (numpy.ndarray): locations of particles, shape (n, 3)
-            r_window (int): the window size to draw the one particle simulation,
-                if r_window==0, the value of 2 * self.r will be taken
-            plot (bool): if True, a figure will be generated as a report
 
         Return:
             numpy.ndarray: the cross-correlation between the difference and a
@@ -597,7 +594,7 @@ class GaussianSphere:
 
     def fit_positions(
         self, image, positions, max_iter=10, ftol=1, eps=1, method='BFGS',
-        no_overlap=True
+        no_overlap=False
     ):
         """
         Refine the positions of particles by minimizing the difference between
@@ -605,8 +602,14 @@ class GaussianSphere:
             optimisation have the format of [var_])
 
         Args:
-            positions (np.array): the positions of particles, shape (n, dim)
             image (np.ndarray): the image to be tracked
+            positions (np.array): the positions of particles, shape (n, dim)
+            max_iter (int): the maximum iter number, see scipy doc for detail
+            ftol (float): see scipy doc for detail
+            eps (float): see scipy doc for detail
+            method (str): see scipy doc for detail
+            no_overlap (bool): if true, the overlapped particles would be
+                removed
 
         Return:
             np.array: the refined positions of particles
@@ -638,7 +641,7 @@ class GaussianSphere:
 
     def find_extra_particles(
             self, locate_func, image, positions, diameter='auto', max_iter=10,
-            threshold=0, plot=True, report=True
+            threshold=0, plot=True
     ):
         """
         Recursively find extra particles in the difference between the image
@@ -653,8 +656,6 @@ class GaussianSphere:
             threshold (float): the intensity threshold, and the particles with
             plot (bool): if true, the cross-correlation of difference image
                 and the one particle simulation will be plotted
-            report (bool): if true, the particle information will be printed
-                in each iteration
 
         Return:
             numpy.ndarray: positions of all the extra particles, shape (n, 3)
@@ -663,11 +664,15 @@ class GaussianSphere:
         if diameter == 'auto':
             diameter = self.r * 2
         confirmed_particles = positions
-        for _ in range(max_iter):
+        for i in range(max_iter):
             # find new particles
+            if plot:
+                print(f"iteration: {i}")
             cc = self.__get_diff_cc(
                 image, confirmed_particles, plot=plot
             )
+            if plot:
+                print()
             new_particles = locate_func(cc)
 
             # check if new particles are overlapping with confirmed particles
