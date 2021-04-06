@@ -11,7 +11,10 @@ except ImportError:
     CPP_ENABLED = False
 
 
-def should_join(p1, p2): return 0 in pdist(np.concatenate((p1, p2))[:, None])
+def should_join(p1, p2):
+    arr = np.concatenate((p1, p2))[:, None]
+    dist = pdist(arr)
+    return 0 in dist
 
 
 def join_pairs_py(pairs, copy=True):
@@ -44,7 +47,7 @@ else:
 def is_inside(position, radius, boundary):
     result = True
     for dim in range(len(boundary)):
-        result *= (position[dim] - np.ceil(radius) > 0)
+        result *= (position[dim] - np.ceil(radius) > 1)
         result *= (position[dim] + np.ceil(radius) < boundary[dim])
     return result
 
@@ -71,25 +74,32 @@ def get_sub_images_3d(image, centres, max_radius):
             int(2 * np.ceil(max_radius) + 1),
             int(2 * np.ceil(max_radius) + 1)
         ))
-        sub_image_box = list(get_sub_image_box(centre, max_radius, image.shape))
-        int_map += image[tuple(sub_image_box)]
+        sub_image_box = tuple(get_sub_image_box(centre, max_radius, image.shape))
+        int_map += image[sub_image_box]
         int_maps.append(int_map)
     return int_maps
 
 
-def see_slice(image, positions, s, radius, axis=2, sizes=(10, 8)):
+def see_slice(
+    image, positions, s, radius, axis=2, sizes=(10, 8),
+    highlight=None, highlight_color='tomato', cmap='viridis'
+):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     to_show = np.moveaxis(image, axis, 0)
-    plt.imshow(to_show[s].T)
+    plt.imshow(to_show[s].T, cmap=cmap)
     if axis == -1:
         axis = 2
     shown_axes = np.array([i for i in range(3) if i != axis])
-    for p in positions:
+    if isinstance(highlight, type(None)):
+        highlight = []
+    for i, p in enumerate(positions):
         x, y = p[shown_axes]
         z = p[axis]
         dz = abs(z - s)
-        if z > s:
+        if i in highlight:
+            color=highlight_color
+        elif z > s:
             color='k'
         else:
             color='w'
@@ -209,6 +219,26 @@ def fix_intensity(image):
     return (fix_z - fix_z.min()) / fix_z.max() * 255
 
 
+def measure_shape(image, centres, win_size, remove_bias=True):
+    """
+    Measure the average shape of particles
+
+    Args:
+        image (np.ndarray): A 3D volumetirc image
+        centres (np.ndarray): The positiosn of particles, shape (n_particle, 3)
+        win_size (int): the size of the measurement window, must be an odd number
+        remove_bias (bool): if true, add random noise to tne centres, to remove the
+            bias from the sub-pixel level inaccuracy.
+    pass
+    """
+    if win_size % 2 != 1:
+        raise ValueError("The value of win_size must be odd")
+    radius = (win_size - 1) // 2
+    # +0.5 because the centre is on the centre of the grid
+    shape = np.mean(get_sub_images_3d(image, centres+0.5, radius), axis=0)
+    return shape
+
+
 def get_model(image, centres, radius, project_axis=0, want_measure=False):
     """
     Calculate a 2D gaussian model from positions
@@ -225,7 +255,7 @@ def get_model(image, centres, radius, project_axis=0, want_measure=False):
         radius (float): the radius of the particle / the size of the small box
         project_axis (int): the axis along wichi the 3D average shape will be projected
     """
-    shape = np.mean(get_sub_images_3d(image, centres, radius), axis=0)
+    shape = np.mean(get_sub_images_3d(image, centres + np.random.random(centres.shape), radius), axis=0)
     res = np.abs(fit_shape(shape.mean(project_axis)))
     model = np.zeros(np.array(shape.shape))
     model[radius, radius, radius] = 1
@@ -476,4 +506,3 @@ def get_gr_pyhs(eta, r_max=5.0, points=1000):
     gr = h + 1
     gr[r < 1] = 0
     return r, gr
-
