@@ -485,21 +485,27 @@ class GaussianSphere:
     def __positions_cost(self, pos_1d, image, weight):
         pos_3d = pos_1d.reshape(int(len(pos_1d)/3), 3)
         intensities = get_intensities(image, pos_3d) * self.__i0
-        sim = csimulate.simulate_spheres(
-            pos_3d, intensities, np.ones(pos_3d.shape[0]), *image.shape
+        radii = np.ones(pos_3d.shape[0]) * self.r
+        simulation = csimulate.simulate_spheres(
+            pos_3d, intensities, radii, *image.shape
         )
-        sim = ndimage.gaussian_filter(sim, sigma=(self.sxy, self.sxy, self.sz))
-        return np.sum(np.power(image - sim, 2) * weight)
+        simulation = ndimage.gaussian_filter(
+            simulation, sigma=(self.sxy, self.sxy, self.sz)
+        )
+        cost = np.sum(np.power(simulation - image, 2) * weight)
+        return cost
 
     def __positions_jacobian(self, pos_1d, image, weight):
         pos_3d = pos_1d.reshape(int(len(pos_1d)/3), 3)
         intensities = get_intensities(image, pos_3d)
         intensities *= self.__i0
-        jac = np.empty(len(r_1d))
+        radii = np.ones(pos_3d.shape[0]) * self.r
+        simulation = csimulate.simulate_spheres(
+            pos_3d, intensities, radii, *image.shape
+        )
+        difference = simulation - image
+        jac = np.empty(len(pos_1d))
         for i, p in enumerate(pos_3d):
-            # shift all the particle wrt particle #i
-            shift = pos_3d - p[np.newaxis, :]
-
             # get the central box with size lxy, lxy, lz
             #   image[box_im] = a image centered to this particle
             c = p.astype(int)
@@ -509,66 +515,126 @@ class GaussianSphere:
                 ) for d in range(3)
             ])
 
-            # find all the particle that might affect the central box
-            dx, dy, dz = np.abs(shift).T
-            mask  = dx < self.__lxy
-            mask *= dy < self.__lxy
-            mask *= dz < self.__lz
-            neighbours = shift[mask] + self.__r_box  # contains [i]
-
             # draw the simulation box that contains these particles
-            shape = self.__r_box * 6 + 3  # also draw 8 neighbour cells
-            neighbours += self.__r_box * 3 + 1 # put particles to central box
-            radii = self.r * np.ones(shift.shape[0], dtype=np.float64)
-            model_padded = csimulate.simulate_spheres(
-                shift[mask], shift_intensities[mask] * self.__i0,
-                radii[mask], *shape
+            model_ = csimulate.simulate_spheres(
+                (p - c + self.__r_box)[np.newaxis, :],
+                np.ones(1) * self.__i0, np.ones(1) * self.r,
+                *self.__r_box * 2 + 1
             )
-            model_padded = ndimage.gaussian_filter(
-                model_padded, sigma=(self.sxy, self.sxy, self.sz)
-            )
-            model_padded_dx = ndimage.gaussian_filter(
-                model_padded, sigma=(self.sxy, self.sxy, self.sz),
-                order=(1, 0, 0)
-            )
-            model_padded_dy = ndimage.gaussian_filter(
-                model_padded, sigma=(self.sxy, self.sxy, self.sz),
-                order=(0, 1, 0)
-            )
-            model_padded_dz = ndimage.gaussian_filter(
-                model_padded, sigma=(self.sxy, self.sxy, self.sz),
-                order=(0, 0, 1)
-            )
+            model_dx =\
+                csimulate.simulate_spheres(
+                    (p - c + self.__r_box)[np.newaxis, :] + np.array((0.5, 0, 0)),
+                    np.ones(1) * self.__i0, np.ones(1) * self.r,
+                    *self.__r_box * 2 + 1
+                ) - \
+                csimulate.simulate_spheres(
+                    (p - c + self.__r_box)[np.newaxis, :] - np.array((0.5, 0, 0)),
+                    np.ones(1) * self.__i0, np.ones(1) * self.r,
+                    *self.__r_box * 2 + 1
+                )
 
-            # shirink to the central box
-            model_centre = (shape - 1) // 2
-            box_model = tuple([slice(
-                model_centre[d] - self.__r_box[d],
-                model_centre[d] + self.__r_box[d] + 1,
-                None
-            ) for d in range(3)])
-            model = model_padded[box_model]
-            model_dx = model_padded_dx[box_model]
-            model_dy = model_padded_dy[box_model]
-            model_dz = model_padded_dz[box_model]
+            model_dy =\
+                csimulate.simulate_spheres(
+                    (p - c + self.__r_box)[np.newaxis, :] + np.array((0, 0.5, 0)),
+                    np.ones(1) * self.__i0, np.ones(1) * self.r,
+                    *self.__r_box * 2 + 1
+                ) - \
+                csimulate.simulate_spheres(
+                    (p - c + self.__r_box)[np.newaxis, :] - np.array((0, 0.5, 0)),
+                    np.ones(1) * self.__i0, np.ones(1) * self.r,
+                    *self.__r_box * 2 + 1
+                )
+
+            model_dz =\
+                csimulate.simulate_spheres(
+                    (p - c + self.__r_box)[np.newaxis, :] + np.array((0, 0, 0.5)),
+                    np.ones(1) * self.__i0, np.ones(1) * self.r,
+                    *self.__r_box * 2 + 1
+                ) - \
+                csimulate.simulate_spheres(
+                    (p - c + self.__r_box)[np.newaxis, :] - np.array((0, 0, 0.5)),
+                    np.ones(1) * self.__i0, np.ones(1) * self.r,
+                    *self.__r_box * 2 + 1
+                )
+
+            model_ = ndimage.gaussian_filter(
+                model_, sigma=(self.sxy, self.sxy, self.sz)
+            )
+            model_dx = ndimage.gaussian_filter(
+                model_dx, sigma=(self.sxy, self.sxy, self.sz)
+            )
+            model_dy = ndimage.gaussian_filter(
+                model_dy, sigma=(self.sxy, self.sxy, self.sz)
+            )
+            model_dz = ndimage.gaussian_filter(
+                model_dz, sigma=(self.sxy, self.sxy, self.sz)
+            )
 
             # calculate the intensity and derivatives
             I = image[tuple(c)]
-            Idx = image[tuple(c + np.array((1, 0, 0)))]
-            Idy = image[tuple(c + np.array((0, 1, 0)))]
-            Idz = image[tuple(c + np.array((0, 0, 1)))]
+            Idx = (
+                image[tuple(c + np.array((1, 0, 0)))] -\
+                image[tuple(c - np.array((1, 0, 0)))]
+            ) / 2
+            Idy = (
+                image[tuple(c + np.array((0, 1, 0)))] -\
+                image[tuple(c - np.array((0, 1, 0)))]
+            ) / 2
+            Idz = (
+                image[tuple(c + np.array((0, 0, 1)))] -\
+                image[tuple(c - np.array((0, 0, 1)))]
+            ) / 2
 
             # calculate the Jacobian
-            D = model - image[box_im]
+            D = difference[box_im]
             W = weight[box_im]
-            jac[i * 3 + 0] = np.sum(2 * D * W * (Idx * model + I * model_dx))
-            jac[i * 3 + 1] = np.sum(2 * D * W * (Idy * model + I * model_dy))
-            jac[i * 3 + 2] = np.sum(2 * D * W * (Idz * model + I * model_dz))
+            A = 2 * D * W
+            jac[i * 3 + 0] = np.sum(A * (Idx * model_ + I * model_dx))
+            jac[i * 3 + 1] = np.sum(A * (Idy * model_ + I * model_dy))
+            jac[i * 3 + 2] = np.sum(A * (Idz * model_ + I * model_dz))
 
         return jac
 
-    def fit_positions(self, image, positions, max_iter=10):
-        pass
+    def fit_positions(
+        self, image, positions, max_iter=10, ftol=1, eps=1, method='BFGS',
+        no_overlap=True
+    ):
+        """
+        Refine the positions of particles by minimizing the difference between
+            real image and simulated image. (All variables especially for
+            optimisation have the format of [var_])
+
+        Args:
+            positions (np.array): the positions of particles, shape (n, dim)
+            image (np.ndarray): the image to be tracked
+
+        Return:
+            np.array: the refined positions of particles
+        """
+        # create padding around the image to contain all FULL particles
+        pad_ = self.__r_box
+        img_ = np.zeros(np.array(image.shape) + pad_ * 2, dtype=np.float64)
+        img_[
+            pad_[0] : -pad_[0],
+            pad_[1] : -pad_[1],
+            pad_[2] : -pad_[2],
+        ] += image
+        pos_ = positions + pad_[np.newaxis, :]
+
+        opt_result_ = minimize(
+            fun=self.__positions_cost,
+            jac=self.__positions_jacobian,
+            x0=pos_.ravel(),
+            method=method,
+            args=(img_, np.ones(img_.shape)),
+            tol=ftol,
+            options={'maxiter': max_iter, 'eps': eps, 'disp': True}
+        )
+        pos_opt_ = np.reshape(opt_result_.x, pos_.shape)
+        pos_opt_ -= pad_
+        if no_overlap:
+            pos_opt_ = remove_overlap(pos_opt_, image, diameter=self.r * 2)
+        return pos_opt_
 
     def find_extra_particles(
             self, locate_func, image, positions, diameter='auto', max_iter=10,
