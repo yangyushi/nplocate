@@ -1,47 +1,14 @@
+"""
+A collection of auxiliary functions
+"""
 import numpy as np
 from numba import njit
 from scipy import ndimage
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit, minimize
 from scipy.spatial.distance import pdist, cdist, squareform
-try:
-    from .cutility import join_pairs as join_pairs_cpp
-    CPP_ENABLED = True
-except ImportError:
-    CPP_ENABLED = False
 
-
-def should_join(p1, p2):
-    arr = np.concatenate((p1, p2))[:, None]
-    dist = pdist(arr)
-    return 0 in dist
-
-
-def join_pairs_py(pairs, copy=True):
-    """
-    Args:
-        pairs (list): a list of tuples
-        copy (bool): very difficult
-    Example:
-        >>> pairs = [(2, 3), (3, 5), (2, 6), (8, 9), (9, 10)]
-        >>> join_pairs(pairs)
-        [(2, 3, 5, 6), (8, 9, 10)]
-    """
-    pairs_joined = pairs[:] if copy else pairs
-    for p1 in pairs_joined:
-        for p2 in pairs_joined:
-            if (p1 is not p2) and should_join(p1, p2):
-                pairs_joined.append(tuple(set(list(p1) + list(p2))))
-                pairs_joined.remove(p1)
-                pairs_joined.remove(p2)
-                pairs_joined = join_pairs(pairs_joined, copy=False)
-                return pairs_joined  # join once per recursion
-    return pairs_joined
-
-if CPP_ENABLED:
-    join_pairs = join_pairs_cpp
-else:
-    join_pairs = join_pairs_py
+from nplocate.cutility import join_pairs
 
 
 def is_inside(position, radius, boundary):

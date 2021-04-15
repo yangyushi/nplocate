@@ -1,4 +1,7 @@
 # distutils: language=c++
+"""
+A collection of auxiliary functions written in cython for efficiency
+"""
 import cython
 from cython.operator cimport preincrement as inc
 from libcpp cimport bool

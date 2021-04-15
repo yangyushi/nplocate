@@ -1,3 +1,8 @@
+"""
+Functions to characteris the positions from the tracking.
+
+These functions should be used as the post processing after tracking.
+"""
 # -*- coding: utf-8 -*-
 import numpy as np
 from numba import njit
