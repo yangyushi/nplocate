@@ -28,6 +28,5 @@ sim = simulate_spheres(
 print(f"new: {time() - t0}s")
 
 
-
 plt.imshow(sim[:, :, l_max//2])
 plt.show()
