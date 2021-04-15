@@ -13,4 +13,4 @@ nplocate/**.c
 nplocate/**.so
 nplocate/**.cpp
 nplocate/**.html
-nplocate/build.sh
+nplocate/build*.sh
