@@ -80,8 +80,14 @@ def simulate_spheres(
 
         for dim in range(dimension):
             pos_1d = pos_view[num, dim]
-            lower_bound = max([0, math.floor(pos_1d - box_size[dim])])
-            upper_bound = min([image_shape[dim] - 1, math.ceil(pos_1d + box_size[dim])])
+            lower_bound = max((
+                0,
+                int(math.floor(pos_1d - box_size[dim]))
+            ))
+            upper_bound = min((
+                image_shape[dim] - 1,
+                int(math.ceil(pos_1d + box_size[dim]))
+            ))
             sub_image_box[dim][0] = lower_bound
             sub_image_box[dim][1] = upper_bound + 1
             sub_image_lengths[dim] = upper_bound - lower_bound + 1

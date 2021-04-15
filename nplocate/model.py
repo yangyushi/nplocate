@@ -1,12 +1,20 @@
-import numpy as np
+# -*- coding: utf-8 -*-
+"""
+Implementation of different models to track particles
+
+Each model should be a self contained class
+"""
 import textwrap
+
+import numpy as np
 from scipy import ndimage
 import matplotlib.pyplot as plt
-from . import csimulate
 from scipy.optimize import minimize
 from scipy.signal import correlate
 from scipy.spatial.distance import cdist
-from .utility import remove_overlap, measure_shape
+
+from nplocate import csimulate
+from nplocate.utility import remove_overlap, measure_shape
 
 
 def get_intensities(image, positions):
@@ -82,19 +90,19 @@ class GaussianSphere:
         ), dtype=int)
 
     def __str__(self):
-        info = f"""\
+        info = """\
         Model for mono dispersed spherical particles.
         The model is a solid sphere, blurred with anisotropic Gaussian PSF.
 
-        The radius of the solid sphere      : {self.r:.4f}
-        The sigma values of the Gaussian PSF: ({self.sxy:.4f}, {self.sxy:.4f}, {self.sz:.4f})
-        """
+        The radius of the solid sphere      : {r:.4f}
+        The sigma values of the Gaussian PSF: ({sxy:.4f}, {sxy:.4f}, {sz:.4f})
+        """.format(r=self.r, sxy=self.sxy, sz=sz)
         return textwrap.dedent(info)
 
     def __repr__(self):
-        info_id = f"""
-        [nplocate.model.GaussianSphere at {hex(id(self))}]
-        """
+        info_id = """
+        [nplocate.model.GaussianSphere at {}]
+        """.format({hex(id(self))})
         return self.__str__() + textwrap.dedent(info_id)
 
     def __setattr__(self, name, val):
@@ -192,9 +200,9 @@ class GaussianSphere:
                 shape of (L, L, L) and L = 2 * r_window + 1
         """
         if isinstance(r_window, type(None)):
-            shape = np.array([self.__lxy, self.__lxy, self.__lz])
+            shape = np.array([self.__lxy, self.__lxy, self.__lz]).astype(int)
         else:
-            shape = np.array([r_window * 2 + 1] * 3)
+            shape = np.array([r_window * 2 + 1] * 3).astype(int)
         radii = np.ones(1, dtype=np.float64) * self.r
         position = shape / 2 - 0.5
         position = position[np.newaxis, :]  # (3, ) -> (1, 3)
@@ -429,6 +437,11 @@ class GaussianSphere:
         ax[3].imshow(sim[sx])
         ax[4].imshow(image[sx])
         ax[5].imshow(diff[sx], cmap='bwr', vmin=-vmax, vmax=vmax)
+
+        ax[0].set_title('simulation')
+        ax[1].set_title('measurement')
+        ax[2].set_title('difference')
+
         for a in ax:
             a.set_xticks([])
             a.set_yticks([])
@@ -667,7 +680,7 @@ class GaussianSphere:
         for i in range(max_iter):
             # find new particles
             if plot:
-                print(f"iteration: {i}")
+                print("iteration: ", i)
             cc = self.__get_diff_cc(
                 image, confirmed_particles, plot=plot
             )
