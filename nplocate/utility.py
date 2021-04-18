@@ -4,6 +4,7 @@ A collection of auxiliary functions
 import numpy as np
 from numba import njit
 from scipy import ndimage
+from scipy import interpolate
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit, minimize
 from scipy.spatial.distance import pdist, cdist, squareform
@@ -110,15 +111,16 @@ def get_gr(positions, cutoff, bins, minimum_gas_number=1e4):
     bins = np.linspace(0, cutoff, bins)
     drs = bins[1:] - bins[:-1]
     distances = pdist(positions).ravel()
+    box = np.array([positions.max(axis=0) - positions.min(axis=0)])
     if positions.shape[0] < minimum_gas_number:
         rg_hists = []
         for i in range(int(minimum_gas_number) // positions.shape[0] + 2):
-            random_gas = np.random.random(positions.shape) * np.array([positions.max(axis=0)])
+            random_gas = np.random.random(positions.shape) * box
             rg_hist = np.histogram(pdist(random_gas), bins=bins)[0]
             rg_hists.append(rg_hist)
-        rg_hist = np.mean(rg_hists, 0)
+        rg_hist = np.mean(rg_hists, axis=0)
     else:
-        random_gas = np.random.random(positions.shape) * np.array([positions.max(axis=0)])
+        random_gas = np.random.random(positions.shape) * box
         rg_hist = np.histogram(pdist(random_gas), bins=bins)[0]
     hist = np.histogram(distances, bins=bins)[0]
     hist = hist / rg_hist
@@ -473,3 +475,87 @@ def get_gr_pyhs(eta, r_max=5.0, points=1000):
     gr = h + 1
     gr[r < 1] = 0
     return r, gr
+
+
+def hist_match(image, bins=100, axes=None):
+    """
+    Matching the intensity distribution of each slice along all axes
+    This functions is designed to fix the slice-by-slice intensity drift in the
+        3D confocal image.
+
+    Args:
+        image (numpy.ndarray): a N-Dimensional Image.
+        bins (int): the number of bins to approximate the probability distribution
+            function (PDF) of the intensities
+        axes (none or iterable): the order of the axes, along which to perform
+            the histgoram matching
+
+    Return:
+        numpy.ndarray: The image whose intensities were fixed.
+    """
+    new_image = image.copy()
+    if isinstance(axes, type(None)):
+        axes = np.arange(image.ndim)
+    for axis in axes:
+        new_image = hist_match_1d(new_image, axis=axis, bins=bins)
+    return new_image
+
+
+def hist_match_1d(image, axis, bins=100):
+    """
+    Matching the intensity distribution of each slice along one axis, to match
+        the overall distribution.
+    This functions is designed to fix the slice-by-slice intensity drift in the
+        3D confocal image.
+
+    Args:
+        image (numpy.ndarray): a N-Dimensional Image.
+        axis (int): the index of axis along which the histogram matching would
+            be performed.
+        bins (int): the number of bins to approximate the probability distribution
+            function (PDF) of the intensities
+
+    Return:
+        numpy.ndarray: The image whose intensities were fixed.
+    """
+    new_image = image.copy()
+    new_image -= new_image.min()
+    # generate the bins
+    if isinstance(bins, int):
+        bins = np.linspace(0, image.max(), bins)
+    bc = (bins[1:] + bins[:-1]) / 2  # bin center
+    bw = bins[1:] - bins[:-1]  # bin width
+
+    # calculate the pdf and cdf from the entire image
+    hist, _ = np.histogram(new_image.ravel(), bins=bins, density=True)
+    pdf = hist / hist.sum()
+    cdf = np.cumsum(pdf)
+    cdf /= cdf.max()
+
+    bc = np.concatenate((np.zeros(1), bc, np.ones(1) * new_image.max()))
+    cdf = np.concatenate((np.zeros(1), cdf, np.ones(1)))
+
+    old_intensities = bc.copy()
+    is_zero = np.isclose(old_intensities, 0)
+    old_intensities[is_zero] = np.inf
+
+    for s in range(new_image.shape[axis]):
+        # calculate the cdf of pixel intensities of one slice
+        slices = [slice(None) for s in range(new_image.ndim)]
+        slices[axis] = s
+        img_slice = new_image[tuple(slices)]
+        hist_slice, _ = np.histogram(img_slice, bins=bins, density=True)
+        pdf_slice = hist_slice / hist_slice.sum()
+        cdf_slice = np.cumsum(pdf_slice)
+        cdf_slice /= cdf_slice.max()
+        cdf_slice = np.concatenate((np.zeros(1), cdf_slice, np.ones(1)))
+
+        # interpolate the cdf of the target distribution
+        f = interpolate.interp1d(y=bc, x=cdf, fill_value=0)
+        new_intensities = f(cdf_slice)
+        ratio = new_intensities / old_intensities
+
+        indices = np.digitize(img_slice, bins=bins) - 2
+        new_image[tuple(slices)] = img_slice * np.take(ratio, indices)
+
+    return new_image
