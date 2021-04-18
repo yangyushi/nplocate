@@ -96,7 +96,7 @@ class GaussianSphere:
 
         The radius of the solid sphere      : {r:.4f}
         The sigma values of the Gaussian PSF: ({sxy:.4f}, {sxy:.4f}, {sz:.4f})
-        """.format(r=self.r, sxy=self.sxy, sz=sz)
+        """.format(r=self.r, sxy=self.sxy, sz=self.sz)
         return textwrap.dedent(info)
 
     def __repr__(self):
@@ -651,6 +651,34 @@ class GaussianSphere:
         if no_overlap:
             pos_opt_ = remove_overlap(pos_opt_, image, diameter=self.r * 2)
         return pos_opt_
+
+    def gd_positions(self, image, positions, step):
+        """
+        Move partile positions according to the gradient
+
+        Args:
+            image (numpy.ndarray): a 3D volumetric image
+            positions (numpy.ndarray): the 3D positions of particles, shape (n, 3)
+            step (float): the particles were moved by step * gradient
+
+        Return:
+            numpy.ndarray: the positions that were moved
+        """
+        pad_ = self.__r_box
+        img_ = np.zeros(np.array(image.shape) + pad_ * 2, dtype=np.float64)
+        img_[
+            pad_[0] : -pad_[0],
+            pad_[1] : -pad_[1],
+            pad_[2] : -pad_[2],
+        ] += image
+        pos_ = (positions + pad_[np.newaxis, :]).flatten()
+        weight_ = np.ones(img_.shape)
+        #cost = self.__positions_cost(pos_, img_, weight_)
+        grad = self.__positions_jacobian(pos_, img_, weight_)
+        pos_ -= grad * step
+        new_pos = pos_.reshape(positions.shape)
+        return new_pos - pad_
+
 
     def find_extra_particles(
             self, locate_func, image, positions, diameter='auto', max_iter=10,
