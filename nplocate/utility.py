@@ -50,7 +50,8 @@ def get_sub_images_3d(image, centres, max_radius):
 
 def see_slice(
     image, positions, s, radius, axis=2, sizes=(10, 8),
-    highlight=None, highlight_color='tomato', cmap='viridis'
+    highlight=None, highlight_color='tomato', cmap='viridis',
+    savename=None,
 ):
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -77,6 +78,9 @@ def see_slice(
             ax.add_patch(circle)
     fig.set_size_inches(sizes[0], sizes[1])
     plt.axis('off')
+    plt.tight_layout()
+    if savename:
+        plt.savefig(savename)
     plt.show()
 
 
