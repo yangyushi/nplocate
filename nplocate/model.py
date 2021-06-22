@@ -180,7 +180,7 @@ class GaussianSphere:
         """
         n = positions.shape[0]
         radii = np.ones(n, dtype=np.float64) * self.r
-        intensities = get_intensities(image, positions)
+        intensities = get_intensities(image, positions).astype(np.float64)
         intensities *= self.__i0
         sim = csimulate.simulate_spheres(
             positions, intensities, radii, *image.shape
@@ -507,7 +507,7 @@ class GaussianSphere:
 
     def __positions_jacobian(self, pos_1d, image, weight):
         pos_3d = pos_1d.reshape(int(len(pos_1d)/3), 3)
-        intensities = get_intensities(image, pos_3d)
+        intensities = get_intensities(image, pos_3d).astype(np.float64)
         intensities *= self.__i0
         radii = np.ones(pos_3d.shape[0]) * self.r
         simulation = csimulate.simulate_spheres(
