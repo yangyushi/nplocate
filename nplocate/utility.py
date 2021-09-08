@@ -563,3 +563,47 @@ def hist_match_1d(image, axis, bins=100):
         new_image[tuple(slices)] = img_slice * np.take(ratio, indices)
 
     return new_image
+
+
+def deconvolve_z(image, blur, ratio_xz, plot=False):
+    """
+    Deconvolve the image along the z-axis.
+
+    This function is typically used to fix the extra blur along the z-axis
+        of the confocal image.
+
+    Reference:
+        [1] 10.1039/C2SM27107A
+        [2] https://github.com/MathieuLeocmach/colloids
+
+    Args:
+        image (numpy.ndarray): a 3D image, in the shape of (x, y, z)
+        blur (float): the sigma of gaussian filter applied to the image
+            in order to remove the noise.
+        ratio_xz (float): the ratio of the voxol sides, side_z / side_x.
+            This can be retrieved from the metadata of the confocal image.
+    """
+    if blur > 0:
+        image_blur = ndimage.gaussian_filter(image, blur)
+    else:
+        image_blur = image.copy()
+
+    fft_x = (np.abs(np.fft.rfft(image_blur, axis=0))**2).mean(1).mean(1)
+    fft_z = (np.abs(np.fft.rfft(image_blur, axis=2))**2).mean(0).mean(0)
+    fft_x_freq = np.fft.fftfreq(2 * len(fft_x), d=1.0)[:len(fft_x)]
+    fft_z_freq = np.fft.fftfreq(2 * len(fft_z), d=ratio_xz)[:len(fft_z)]
+    fft_x_rescale = np.interp(fft_z_freq, fft_x_freq, fft_x)
+    kernel = np.sqrt(fft_x_rescale / fft_z)
+
+    if plot:
+        plt.plot(kernel)
+        plt.plot((0, len(kernel)), (1, 1))
+        plt.tight_layout()
+        plt.show()
+
+    img_deconv = np.fft.irfft(
+        np.fft.rfft(image_blur, axis=2) * kernel[None, None, :],
+        axis=2,
+        n=image.shape[2]
+    )
+    return img_deconv

@@ -2,7 +2,7 @@ import numpy
 from setuptools import setup, find_packages
 from Cython.Build import cythonize
 
-__version__ = '0.2.6'
+__version__ = '0.2.7'
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
